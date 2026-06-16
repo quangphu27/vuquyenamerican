@@ -21,11 +21,13 @@ class DashboardService:
             "documents": self.db.documents.count_documents({}),
             "video_lessons": self.db.video_lessons.count_documents({}),
             "pending_students": self.db.students.count_documents({"status": "pending"}),
+            "new_contacts": self.db.contacts.count_documents({"status": "new"}),
         }
 
     def admin_recent_activity(self):
         activities = []
         for collection, label in [
+            ("contacts", "Liên hệ mới"),
             ("students", "Học sinh mới đăng ký"),
             ("quiz_results", "Bài tập được nộp"),
             ("documents", "Tài liệu mới"),
@@ -36,7 +38,7 @@ class DashboardService:
                 activities.append({
                     "type": collection,
                     "label": label,
-                    "name": item.get("full_name") or item.get("title") or item.get("student_name", ""),
+                    "name": item.get("full_name") or item.get("title") or item.get("student_name") or item.get("name", ""),
                     "created_at": item.get("created_at"),
                 })
         activities.sort(key=lambda x: x.get("created_at") or utcnow(), reverse=True)

@@ -116,11 +116,16 @@ class ContentService:
 
     # Contact
     def submit_contact(self, data):
+        name = (data.get("name") or "").strip()
+        email = (data.get("email") or "").strip()
+        message = (data.get("message") or "").strip()
+        if not name or not email or not message:
+            raise ValueError("Vui lòng nhập đầy đủ họ tên, email và nội dung")
         contact = self.contact_repo.create({
-            "name": data["name"],
-            "email": data["email"],
-            "phone": data.get("phone", ""),
-            "message": data["message"],
+            "name": name,
+            "email": email,
+            "phone": (data.get("phone") or "").strip(),
+            "message": message,
             "status": "new",
         })
         try:
@@ -135,6 +140,35 @@ class ContentService:
         except Exception:
             pass
         return serialize_doc(contact)
+
+    def list_contacts(self, page=1, per_page=20, status=None):
+        filter_query = {}
+        if status:
+            filter_query["status"] = status
+
+        def query(skip, limit):
+            return self.contact_repo.find_all(
+                filter_query, skip, limit, sort=[("created_at", -1)]
+            )
+
+        return paginate(query, page, per_page)
+
+    def get_contact(self, contact_id):
+        contact = self.contact_repo.find_by_id(contact_id)
+        return serialize_doc(contact) if contact else None
+
+    def update_contact_status(self, contact_id, status):
+        allowed = {"new", "read", "replied"}
+        if status not in allowed:
+            raise ValueError("Trạng thái không hợp lệ")
+        contact = self.contact_repo.find_by_id(contact_id)
+        if not contact:
+            return None
+        updated = self.contact_repo.update(contact_id, {"status": status})
+        return serialize_doc(updated)
+
+    def delete_contact(self, contact_id):
+        return self.contact_repo.delete(contact_id)
 
     def get_homepage_data(self):
         news_result = self.list_news(1, 6)

@@ -78,6 +78,34 @@ def submit_contact():
     return ctrl.submit_contact()
 
 
+@bp.route("/contact", methods=["GET"])
+@jwt_required()
+@admin_required
+def list_contacts():
+    return ctrl.list_contacts()
+
+
+@bp.route("/contact/<contact_id>", methods=["GET"])
+@jwt_required()
+@admin_required
+def get_contact(contact_id):
+    return ctrl.get_contact(contact_id)
+
+
+@bp.route("/contact/<contact_id>", methods=["PATCH"])
+@jwt_required()
+@admin_required
+def update_contact_status(contact_id):
+    return ctrl.update_contact_status(contact_id)
+
+
+@bp.route("/contact/<contact_id>", methods=["DELETE"])
+@jwt_required()
+@admin_required
+def delete_contact(contact_id):
+    return ctrl.delete_contact(contact_id)
+
+
 @bp.route("/seo/<page_key>", methods=["GET"])
 def get_seo(page_key):
     return ctrl.get_seo(page_key)

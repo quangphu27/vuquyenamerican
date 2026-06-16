@@ -73,8 +73,44 @@ def delete_course(course_id):
 
 def submit_contact():
     data = request.get_json() or {}
-    contact = content_service.submit_contact(data)
+    try:
+        contact = content_service.submit_contact(data)
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
     return jsonify({"message": "Gửi liên hệ thành công", "contact": contact}), 201
+
+
+def list_contacts():
+    page = request.args.get("page", 1)
+    status = request.args.get("status") or None
+    return jsonify(content_service.list_contacts(int(page), 20, status)), 200
+
+
+def get_contact(contact_id):
+    contact = content_service.get_contact(contact_id)
+    if not contact:
+        return jsonify({"message": "Không tìm thấy liên hệ"}), 404
+    return jsonify(contact), 200
+
+
+def update_contact_status(contact_id):
+    data = request.get_json() or {}
+    status = data.get("status")
+    if not status:
+        return jsonify({"message": "Thiếu trạng thái"}), 400
+    try:
+        contact = content_service.update_contact_status(contact_id, status)
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    if not contact:
+        return jsonify({"message": "Không tìm thấy liên hệ"}), 404
+    return jsonify(contact), 200
+
+
+def delete_contact(contact_id):
+    if not content_service.delete_contact(contact_id):
+        return jsonify({"message": "Không tìm thấy liên hệ"}), 404
+    return jsonify({"message": "Đã xóa"}), 200
 
 
 def get_seo(page_key):
