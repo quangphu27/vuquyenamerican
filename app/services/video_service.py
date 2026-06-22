@@ -4,6 +4,7 @@ from app.repositories.video_repository import (
     SubtitleRepository,
     AudioRecordRepository,
     VideoProgressRepository,
+    VideoStoryRepository,
 )
 from app.repositories.quiz_repository import QuestionRepository
 from app.utils.helpers import serialize_doc
@@ -18,7 +19,76 @@ class VideoService:
         self.subtitle_repo = SubtitleRepository()
         self.audio_repo = AudioRecordRepository()
         self.progress_repo = VideoProgressRepository()
+        self.story_repo = VideoStoryRepository()
         self.question_repo = QuestionRepository()
+
+    def list_levels(self):
+        levels = []
+        for level in range(1, 10):
+            story_count = self.story_repo.count_by_level(level)
+            episode_count = self.video_repo.count_by_level(level)
+            levels.append({
+                "level": level,
+                "story_count": story_count,
+                "episode_count": episode_count,
+            })
+        return levels
+
+    def list_stories(self, level):
+        items, total = self.story_repo.find_by_level(level)
+        result = []
+        for story in items:
+            doc = serialize_doc(story)
+            doc["episode_count"] = self.video_repo.count_by_story(str(story["_id"]))
+            result.append(doc)
+        return {"items": result, "level": int(level), "total": total}
+
+    def list_episodes(self, story_id):
+        story = self.story_repo.find_by_id(story_id)
+        if not story:
+            return None
+        items, total = self.video_repo.find_by_story(story_id)
+        published = [v for v in items if v.get("status") == "published"]
+        return {
+            "story": serialize_doc(story),
+            "items": [serialize_doc(v) for v in published],
+            "total": len(published),
+        }
+
+    def create_story(self, data, teacher_id):
+        level = int(data.get("level", 1))
+        if level < 1 or level > 9:
+            raise ValueError("Level phải từ 1 đến 9")
+        story = self.story_repo.create({
+            "level": level,
+            "title": data["title"].strip(),
+            "description": data.get("description", "").strip(),
+            "thumbnail": data.get("thumbnail", ""),
+            "order": int(data.get("order") or 0),
+            "teacher_id": ObjectId(teacher_id),
+        })
+        return serialize_doc(story)
+
+    def update_story(self, story_id, data):
+        story = self.story_repo.find_by_id(story_id)
+        if not story:
+            return None
+        allowed = {"title", "description", "thumbnail", "order", "level"}
+        update_data = {k: v for k, v in data.items() if k in allowed and v not in (None, "")}
+        if "level" in update_data:
+            update_data["level"] = int(update_data["level"])
+        if "order" in update_data:
+            update_data["order"] = int(update_data["order"])
+        if not update_data:
+            return serialize_doc(story)
+        updated = self.story_repo.update(story_id, update_data)
+        return serialize_doc(updated)
+
+    def delete_story(self, story_id):
+        episodes, _ = self.video_repo.find_by_story(story_id, 0, 500)
+        for ep in episodes:
+            self.delete_lesson(str(ep["_id"]))
+        return self.story_repo.delete(story_id)
 
     def list_lessons(self, class_id=None, page=1, per_page=20):
         skip = (page - 1) * per_page
@@ -55,15 +125,29 @@ class VideoService:
         audio_info = upload_file(video_with_audio, subfolder="videos", resource_type="video") if video_with_audio else None
         muted_info = upload_file(video_muted, subfolder="videos", resource_type="video") if video_muted else None
 
+        title = data.get("title") or data.get("episode_title") or "Bài học video"
         lesson_data = {
-            "title": data["title"],
+            "title": title,
             "description": data.get("description", ""),
-            "class_id": ObjectId(data["class_id"]),
             "teacher_id": ObjectId(teacher_id),
             "video_with_audio_url": audio_info["url"] if audio_info else data.get("video_with_audio_url", ""),
             "video_muted_url": muted_info["url"] if muted_info else data.get("video_muted_url", ""),
-            "status": "draft",
+            "status": data.get("status", "draft"),
         }
+
+        if data.get("story_id"):
+            story = self.story_repo.find_by_id(data["story_id"])
+            if not story:
+                raise ValueError("Không tìm thấy truyện")
+            lesson_data["story_id"] = ObjectId(data["story_id"])
+            lesson_data["level"] = int(data.get("level") or story.get("level") or 1)
+            lesson_data["episode_number"] = int(data.get("episode_number") or 1)
+            lesson_data["episode_title"] = data.get("episode_title", title)
+        elif data.get("class_id"):
+            lesson_data["class_id"] = ObjectId(data["class_id"])
+        else:
+            raise ValueError("Cần chọn truyện hoặc lớp học")
+
         lesson = self.video_repo.create(lesson_data)
         return serialize_doc(lesson)
 
@@ -72,10 +156,16 @@ class VideoService:
         if not lesson:
             return None
 
-        allowed = {"title", "description", "status", "class_id"}
+        allowed = {"title", "description", "status", "class_id", "story_id", "level", "episode_number", "episode_title"}
         update_data = {k: v for k, v in data.items() if k in allowed and v not in (None, "")}
         if "class_id" in update_data:
             update_data["class_id"] = ObjectId(update_data["class_id"])
+        if "story_id" in update_data:
+            update_data["story_id"] = ObjectId(update_data["story_id"])
+        if "level" in update_data:
+            update_data["level"] = int(update_data["level"])
+        if "episode_number" in update_data:
+            update_data["episode_number"] = int(update_data["episode_number"])
 
         if video_with_audio:
             audio_info = upload_file(video_with_audio, subfolder="videos", resource_type="video")

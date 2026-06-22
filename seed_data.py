@@ -211,9 +211,25 @@ def seed():
             "updated_at": now,
         })
 
+        video_result = db.video_stories.insert_one({
+            "level": 1,
+            "title": "Greetings Story",
+            "description": "Hoc cach chao hoi qua truyen ngan",
+            "thumbnail": "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600",
+            "order": 1,
+            "teacher_id": teacher_id,
+            "created_at": now,
+            "updated_at": now,
+        })
+        story_id = video_result.inserted_id
+
         video_result = db.video_lessons.insert_one({
-            "title": "Video Lesson 1 - Greetings",
+            "title": "Tap 1 - Greetings",
+            "episode_title": "Tap 1 - Greetings",
+            "episode_number": 1,
             "description": "Hoc cach chao hoi bang tieng Anh",
+            "story_id": story_id,
+            "level": 1,
             "class_id": class_id,
             "teacher_id": teacher_id,
             "video_with_audio_url": "https://res.cloudinary.com/demo/video/upload/dog.mp4",

@@ -30,6 +30,7 @@ def create_app(config_class=Config):
     from app.routes.document_routes import bp as document_bp
     from app.routes.quiz_routes import bp as quiz_bp
     from app.routes.video_routes import bp as video_bp
+    from app.routes.video_tree_routes import bp as video_tree_bp
     from app.routes.content_routes import bp as content_bp
     from app.routes.dashboard_routes import bp as dashboard_bp
 
@@ -39,6 +40,7 @@ def create_app(config_class=Config):
     app.register_blueprint(document_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(video_bp)
+    app.register_blueprint(video_tree_bp)
     app.register_blueprint(content_bp)
     app.register_blueprint(dashboard_bp)
 

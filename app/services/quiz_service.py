@@ -111,14 +111,20 @@ class QuizService:
 
     def add_question(self, quiz_id, data):
         questions = self.question_repo.find_by_quiz(quiz_id)
+        q_type = data.get("question_type", "multiple_choice")
         q_data = {
             "quiz_id": ObjectId(quiz_id),
             "content": data["content"],
             "image": data.get("image", ""),
-            "options": data["options"],
-            "correct_answer": data["correct_answer"],
+            "question_type": q_type,
             "order": len(questions) + 1,
         }
+        if q_type == "short_answer":
+            q_data["options"] = {}
+            q_data["correct_answer"] = data.get("sample_answer", data.get("correct_answer", ""))
+        else:
+            q_data["options"] = data["options"]
+            q_data["correct_answer"] = data["correct_answer"]
         question = self.question_repo.create(q_data)
         return serialize_doc(question)
 
@@ -155,25 +161,50 @@ class QuizService:
         questions = self.question_repo.find_by_quiz(quiz_id)
         correct = 0
         wrong = 0
+        pending = 0
+        gradable_total = 0
         detail = []
         for q in questions:
             qid = str(q["_id"])
             student_ans = answers.get(qid, "")
-            is_correct = student_ans == q.get("correct_answer")
-            if is_correct:
-                correct += 1
+            q_type = q.get("question_type", "multiple_choice")
+            if q_type == "short_answer":
+                sample = (q.get("correct_answer") or "").strip().lower()
+                text = (student_ans or "").strip()
+                is_correct = bool(sample and text.lower() == sample)
+                needs_review = not sample or not is_correct
+                if needs_review:
+                    pending += 1
+                else:
+                    correct += 1
+                    gradable_total += 1
+                detail.append({
+                    "question_id": qid,
+                    "content": q.get("content"),
+                    "student_answer": student_ans,
+                    "correct_answer": q.get("correct_answer"),
+                    "is_correct": is_correct if not needs_review else None,
+                    "question_type": q_type,
+                    "needs_review": needs_review,
+                })
             else:
-                wrong += 1
-            detail.append({
-                "question_id": qid,
-                "content": q.get("content"),
-                "student_answer": student_ans,
-                "correct_answer": q.get("correct_answer"),
-                "is_correct": is_correct,
-            })
+                gradable_total += 1
+                is_correct = student_ans == q.get("correct_answer")
+                if is_correct:
+                    correct += 1
+                else:
+                    wrong += 1
+                detail.append({
+                    "question_id": qid,
+                    "content": q.get("content"),
+                    "student_answer": student_ans,
+                    "correct_answer": q.get("correct_answer"),
+                    "is_correct": is_correct,
+                    "question_type": q_type,
+                })
 
         total = len(questions)
-        score = round((correct / total) * 10, 1) if total else 0
+        score = round((correct / gradable_total) * 10, 1) if gradable_total else 0
 
         student = self.student_repo.find_by_id(student_id)
         result_data = {
@@ -184,6 +215,7 @@ class QuizService:
             "score": score,
             "correct": correct,
             "wrong": wrong,
+            "pending_review": pending,
             "total": total,
             "time_taken": time_taken,
             "answers_detail": detail,

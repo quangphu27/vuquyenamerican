@@ -23,7 +23,10 @@ def create_lesson():
     data = request.form.to_dict()
     video_audio = request.files.get("video_with_audio")
     video_muted = request.files.get("video_muted")
-    lesson = video_service.create_lesson(data, get_jwt_identity(), video_audio, video_muted)
+    try:
+        lesson = video_service.create_lesson(data, get_jwt_identity(), video_audio, video_muted)
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
     return jsonify(lesson), 201
 
 
@@ -110,4 +113,42 @@ def complete_step(lesson_id):
 
 def delete_lesson(lesson_id):
     video_service.delete_lesson(lesson_id)
+    return jsonify({"message": "Đã xóa"}), 200
+
+
+def list_levels():
+    return jsonify({"items": video_service.list_levels()}), 200
+
+
+def list_stories(level):
+    return jsonify(video_service.list_stories(level)), 200
+
+
+def list_episodes(story_id):
+    result = video_service.list_episodes(story_id)
+    if not result:
+        return jsonify({"message": "Không tìm thấy truyện"}), 404
+    return jsonify(result), 200
+
+
+def create_story():
+    data = request.get_json() or request.form.to_dict()
+    try:
+        story = video_service.create_story(data, get_jwt_identity())
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    return jsonify(story), 201
+
+
+def update_story(story_id):
+    data = request.get_json() or request.form.to_dict()
+    story = video_service.update_story(story_id, data)
+    if not story:
+        return jsonify({"message": "Không tìm thấy truyện"}), 404
+    return jsonify(story), 200
+
+
+def delete_story(story_id):
+    if not video_service.delete_story(story_id):
+        return jsonify({"message": "Không tìm thấy truyện"}), 404
     return jsonify({"message": "Đã xóa"}), 200

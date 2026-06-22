@@ -8,6 +8,35 @@ class VideoLessonRepository(BaseRepository):
     def find_by_class(self, class_id, skip=0, limit=20):
         return self.find_all({"class_id": ObjectId(class_id)}, skip, limit, sort=[("created_at", -1)])
 
+    def find_by_story(self, story_id, skip=0, limit=100):
+        return self.find_all(
+            {"story_id": ObjectId(story_id)},
+            skip,
+            limit,
+            sort=[("episode_number", 1), ("created_at", 1)],
+        )
+
+    def count_by_story(self, story_id):
+        return self.count({"story_id": ObjectId(story_id)})
+
+    def count_by_level(self, level):
+        return self.count({"level": int(level), "status": "published"})
+
+
+class VideoStoryRepository(BaseRepository):
+    collection_name = "video_stories"
+
+    def find_by_level(self, level, skip=0, limit=100):
+        return self.find_all(
+            {"level": int(level)},
+            skip,
+            limit,
+            sort=[("order", 1), ("title", 1)],
+        )
+
+    def count_by_level(self, level):
+        return self.count({"level": int(level)})
+
 
 class SubtitleRepository(BaseRepository):
     collection_name = "subtitles"
